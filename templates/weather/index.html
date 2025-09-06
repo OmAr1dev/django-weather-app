@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Weather App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes fadeInUp { 0% { opacity: 0; transform: translateY(20px); } 100% { opacity: 1; transform: translateY(0); } }
+        .animate-fadeInUp { animation: fadeInUp 0.8s ease forwards; }
+
+        /* Raindrops */
+        .raindrop { position: absolute; width: 2px; height: 10px; background: rgba(255,255,255,0.7); animation: fall 1s linear infinite; }
+        @keyframes fall { 0% { transform: translateY(-10px); opacity:0.5; } 100% { transform: translateY(600px); opacity:0; } }
+
+        /* Snowflakes */
+        .snowflake { position: absolute; width: 6px; height: 6px; background: white; border-radius: 50%; opacity:0.8; animation: snowFall 5s linear infinite; }
+        @keyframes snowFall { 0% { transform: translateY(-10px) translateX(0); } 100% { transform: translateY(600px) translateX(50px); } }
+
+        /* Sun rays */
+        .sun-ray { width:200px; height:200px; border-radius:50%; background: radial-gradient(circle, rgba(255,255,0,0.5) 30%, transparent 70%); position:absolute; top:-50px; left:calc(50%-100px); animation:rotateRay 5s linear infinite; }
+        @keyframes rotateRay { 0% {transform:rotate(0deg);} 100% {transform:rotate(360deg);} }
+
+        /* Clouds */
+        .cloud { animation: floatCloud 30s linear infinite; }
+        @keyframes floatCloud { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+
+        /* Mist */
+        .mist { position: absolute; background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 70%); border-radius: 50%; animation: drift 20s linear infinite; }
+        @keyframes drift { 0% { transform: translateX(-250px) translateY(0); } 50% { transform: translateX(100vw) translateY(50px); } 100% { transform: translateX(-250px) translateY(0); } }
+    </style>
+</head>
+<body id="body" class="relative min-h-screen flex flex-col items-center justify-start transition-colors duration-1000 bg-gradient-to-br from-blue-500 to-indigo-600">
+
+<h1 class="text-5xl font-bold text-white mt-10 mb-6 drop-shadow-lg">Weather App</h1>
+
+<div class="flex w-full max-w-6xl gap-6 px-4">
+
+    <!-- Main Weather Section -->
+    <div class="flex-grow relative">
+        <!-- Search Form -->
+        <form method="post" class="flex mb-4">
+            {% csrf_token %}
+            <input type="text" name="city" placeholder="Enter city" required
+                class="flex-grow p-3 rounded-l-lg border-none outline-none text-gray-800 placeholder-gray-500">
+            <button type="submit" class="bg-blue-600 text-white px-5 rounded-r-lg hover:bg-blue-700 transition-colors">
+                {% if weather_data %}Change City{% else %}Check City{% endif %}
+            </button>
+        </form>
+
+        <!-- First Load Friendly Welcome -->
+        {% if not weather_data %}
+            <div class="bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl p-8 text-center animate-fadeInUp">
+                <div class="text-6xl mb-4">🌤️</div>
+                <h2 class="text-2xl font-semibold text-gray-800 mb-2">Welcome to Weather App</h2>
+                <p class="text-gray-600">Start by entering a city name above to see the latest weather.</p>
+            </div>
+        {% endif %}
+
+        <!-- Weather Card -->
+        {% if weather_data %}
+            {% if weather_data.error %}
+                <div class="bg-red-200 text-red-800 px-4 py-2 rounded mb-4">{{ weather_data.error }}</div>
+            {% else %}
+                <div id="weatherCard" class="bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl p-6 animate-fadeInUp text-center">
+                    <h2 class="text-3xl font-semibold mb-2">{{ weather_data.name }}</h2>
+                    <img src="{{ weather_data.icon }}" alt="Weather Icon" class="mx-auto w-28 h-28 mb-2 animate-bounce">
+                    <p class="text-xl font-medium capitalize mb-2">{{ weather_data.description }}</p>
+                    <p class="text-blue-600 mb-1">Temperature: {{ weather_data.temp }} °C</p>
+                    <p class="text-blue-600 mb-1">Feels Like: {{ weather_data.feels_like }} °C</p>
+
+                    <div class="mt-4 border-t border-gray-300 pt-4 text-left text-gray-700">
+                        <p class="mb-1">Humidity: {{ weather_data.humidity }}%</p>
+                        <p class="mb-1">Pressure: {{ weather_data.pressure }} hPa</p>
+                        <p class="mb-1">Wind: {{ weather_data.wind_speed }} m/s at {{ weather_data.wind_deg }}°</p>
+                        <p class="mb-1">Cloudiness: {{ weather_data.clouds }}%</p>
+                        <p class="mb-1">Sunrise: {{ weather_data.sunrise }}</p>
+                        <p class="mb-1">Sunset: {{ weather_data.sunset }}</p>
+                        <p class="mb-1">Coordinates: lat {{ weather_data.coord.lat }}, lon {{ weather_data.coord.lon }}</p>
+                    </div>
+                </div>
+            {% endif %}
+        {% endif %}
+    </div>
+
+    <!-- History Panel -->
+    <div class="w-64 bg-white/80 backdrop-blur-md rounded p-4 h-fit">
+        <h3 class="font-semibold mb-2">Search History</h3>
+        <ul>
+            {% for item in history %}
+                <li class="mb-2 flex justify-between items-center">
+                    <span class="cursor-pointer hover:underline" onclick="searchFromHistory('{{ item.city }}')">
+                        {{ item.city }} - {{ item.time }}
+                    </span>
+                    <form method="post" action="{% url 'weather_view' %}" class="inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="delete_index" value="{{ forloop.counter0 }}">
+                        <button type="submit" class="text-red-500 hover:text-red-700">&times;</button>
+                    </form>
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+
+<script>
+    function searchFromHistory(city){
+        document.querySelector('input[name="city"]').value = city;
+        document.forms[0].submit();
+    }
+
+    // Dynamic background & effects
+    {% if weather_data %}
+        const body = document.getElementById('body');
+        const weather = "{{ weather_data.description|lower }}";
+
+        if(weather.includes('rain')){
+            body.className = "relative min-h-screen bg-blue-500 flex flex-col items-center justify-start transition-colors duration-1000";
+            for(let i=0;i<50;i++){
+                const drop = document.createElement('div');
+                drop.className='raindrop';
+                drop.style.left=Math.random()*window.innerWidth+'px';
+                drop.style.animationDelay=Math.random()+'s';
+                body.appendChild(drop);
+            }
+        } else if(weather.includes('snow')){
+            body.className = "relative min-h-screen bg-blue-200 flex flex-col items-center justify-start transition-colors duration-1000";
+            for(let i=0;i<50;i++){
+                const snow=document.createElement('div');
+                snow.className='snowflake';
+                snow.style.left=Math.random()*window.innerWidth+'px';
+                snow.style.animationDelay=Math.random()*5+'s';
+                body.appendChild(snow);
+            }
+        } else if(weather.includes('clear') || weather.includes('sun')){
+            body.className = "relative min-h-screen bg-yellow-300 flex flex-col items-center justify-start transition-colors duration-1000";
+            const sunRay=document.createElement('div');
+            sunRay.className='sun-ray';
+            body.appendChild(sunRay);
+        } else if(weather.includes('cloud')){
+            body.className = "relative min-h-screen bg-gray-400 flex flex-col items-center justify-start transition-colors duration-1000";
+            for(let i=0;i<5;i++){
+                const cloud=document.createElement('div');
+                cloud.className='cloud absolute w-48 h-24 bg-white rounded-full opacity-50';
+                cloud.style.top=Math.random()*300+'px';
+                cloud.style.left=Math.random()*window.innerWidth+'px';
+                body.appendChild(cloud);
+            }
+        } else if(weather.includes('mist') || weather.includes('fog') || weather.includes('haze')){
+            body.className = "relative min-h-screen bg-gray-500 flex flex-col items-center justify-start transition-colors duration-1000";
+            for(let i=0;i<10;i++){
+                const mist = document.createElement('div');
+                mist.className='mist';
+                mist.style.width=(150 + Math.random()*100) + 'px';
+                mist.style.height=(150 + Math.random()*100) + 'px';
+                mist.style.top=Math.random()*window.innerHeight+'px';
+                mist.style.animationDelay=(Math.random()*20) + 's';
+                mist.style.opacity=0.1 + Math.random()*0.2;
+                body.appendChild(mist);
+            }
+        }
+    {% endif %}
+</script>
+
+</body>
+</html> 
