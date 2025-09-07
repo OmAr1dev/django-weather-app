@@ -1,9 +1,8 @@
 from datetime import datetime
 
 import requests
+from django.conf import settings
 from django.shortcuts import redirect, render
-
-API_KEY = "0a7e273c55ab5a31205da2c00cc2536f"
 
 
 def weather_view(request):
@@ -24,7 +23,7 @@ def weather_view(request):
     if request.method == "POST" and request.POST.get("city"):
         city = request.POST.get("city")
 
-        url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={API_KEY}&units=metric"
+        url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={settings.OPENWEATHER_API_KEY}&units=metric"
         response = requests.get(url)
 
         if response.status_code == 200:
